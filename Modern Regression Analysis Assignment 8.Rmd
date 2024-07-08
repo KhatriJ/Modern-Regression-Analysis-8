@@ -1,0 +1,227 @@
+---
+title: "Modern Regression Analysis Assignment 8"
+
+author: "Jigar Khatri"
+output:
+  html_document:
+    df_print: paged
+  pdf_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+
+## 8.4 Refer to Muscle Mass Problem 1.27. A person's muscle mass is expected to decrease with age. To explore this relationship in women, a nutritionist randomly selected 15 women from each 10 year age group beginning with age 40 and ending with age 79. X is age and Y is a measure of muscle mass. A second order regression model 8.2 with independent normal error terms is expected to be appropriate. 
+
+
+### 8.4a Fit regression model 8.2. Plot the regression function and data. Does the quadratic regression function appear to be a good fit? Find the $R^2$. 
+
+```{r include = FALSE}
+setwd("/Users/jigarkhatri/Library/Mobile Documents/com~apple~CloudDocs/Baruch MS Stats/Modern Regression Analysis")
+library(ALSM)
+library(ggplot2)
+library(dplyr)
+library(broom)
+library(ggpubr)
+library(MASS)
+library(conflicted)
+
+```
+
+
+```{r}
+# Muscle Mass is supposed to decrease with age. Y is muscle mass and X is age in years.
+
+Muscle_Mass <- read.csv("Muscle_Mass.csv")
+head(Muscle_Mass)
+
+ # Squaring the X value age and saving it to a variable to add it to a new dataframe
+Age_Squared = Muscle_Mass$X^2.  
+
+# Combining the squared age value to the original df to create a new dataframe 
+Muscle_Mass2 <- cbind(Muscle_Mass,Age_Squared)
+
+# Visualizing relationships between variable with a pairs plot
+pairs(Muscle_Mass2) 
+
+# Measuring correlation between variables  
+round(cor(Muscle_Mass2),digits=2)   
+
+```
+### The pairs plot and the correlation table both indicate strong correlation between the two independent variables. The existence of multicollinearity makes it difficult to interpret coefficients and makes regression estimates less precise. This ultimately makes it difficult to determine which coefficients are statistically significant. Centering indepdendent variables is one technique to correct for multicollinearity. 
+
+```{r}
+
+# Centering the values to eliminate multicollinearity
+Age_centered <- Muscle_Mass$X - mean(Muscle_Mass$X)
+
+# Creating a new dataframe with the centered values.
+centered_df <- cbind(Muscle_Mass,Age_centered)
+head(centered_df)
+
+# Checking correlation between the centered X value and it's squared value. 
+cor(centered_df$Age_centered,centered_df$Age_centered^2)
+
+# Fitting the model and checking the summary statistics. I function is used to account for interaction effects. 
+mquad <- lm(Y~Age_centered + I(Age_centered^2), data= centered_df); summary(mquad)
+
+# Plotting the residuals against the fitted values for regression diagnostics. 
+plot(mquad$residuals~mquad$fitted.values,xlab = "Predicted Values Quad", ylab = "Residuals Quad")
+
+```
+
+#####  The regression function is: E{Y} = 82.935749 - 1.183958X + 0.014840$X^2$. The $R^2$ is 0.7632. The residuals plot indicates that there are no issues with violations of linearity or non-constantcy of error variance.
+
+
+
+
+
+### 8.4b Test whether or not there is a regression relation. Use alpha of 0.05. State alternatives, decision rule, and conclusion
+
+
+##### H~0~: B~1~ = B~2~ = 0
+##### H~a~: At least one of the coefficients, B~1~ and B~2~ is not equal to 0.
+##### Decision rule: If F statistic (aka F*) > F-critical value, reject null and conclude Ha. Otherwise, fail to reject null hypothesis. 
+
+```{r}
+### Question is asking us to conduct an F-Test.
+
+print(paste("F-critical value given alpha of 0.05, numerator df 2, and denominator df of 57:" , round(qf(0.05,2,57,lower.tail = FALSE), digits = 4)))
+anova(mquad)
+summary(mquad)
+``` 
+#####  The F statistic from the summary table is 91.84. We can calculate that value from the ANOVA table as well by summing the mean squared values for each of the independent variables and dividing by their numerator degrees of freedom which is going to be 1 for each independent variable ((11627.5 + 203.1)/2) = 5915.3. This is our mean sqaured regression value (aka MSR). We then divide 5915.3 by the mean squared value of the residuals (64.4) which gives us 91.85 for the F-statistic which is about the same as the value in our summary table. Since the F-Statistic of 91.84 is greater than the F-critical value of 3.158843, we reject the null hypothesis and conclude Ha which is that at least one of the coefficients is not equal to zero.
+
+
+### 8.4c Estimate the mean muscle mass for women aged 48 years; use a 95 percent confidence interval. Interpret your interval.
+
+
+```{r}
+
+# Plug in the centered value of the Age and not 48 to get the correct answer. 
+predict(mquad,data.frame(Age_centered = -11.98333333 ),level=0.95,interval = "confidence")
+```
+
+##### The mean muscle mass estimated by the regression function for a 48 year old woman is 99.25461 lbs (aka our point estimate). Using a 95% level of confidence, the lower bound of the confidence interval is 96.28436  and the upper bound of the interval is 102.2249. What this means is that we can be 95% confident that the population mean muscle mass for a 48 year old woman is between 96.28436 and 102.2249. If you take a large number of samples (say 100) and calculate a confidence interval of the mean from each sample, 95 of the intervals would contain the the population mean muscle mass for a 48 year old woman. 
+
+
+
+### 8.4d Predict the mean muscle mass for women aged 48 years; use a 95 percent confidence interval. Interpret your interval.
+
+```{r}
+# Plug in the centered value of Age and not 48 to get the correct answer. 
+predict(mquad,data.frame(Age_centered = -11.98333333 ),level=0.95,interval = "prediction")
+```
+
+##### The mean muscle mass estimated by the regression function for a 48 year woman is 99.25461 lbs (aka our point estimate). The lower bound of the prediction interval is 82.9116 and the upper bound of the interval is 115.5976. Unlike the confidence interval, which involves constructing an interval that contains the population parameter being estimated with a certain degree of confidence, the prediction interval produces a range that contains the value of the response variable for a new observation based on the specific values of the predictor variable(s). For this problem we can say that we are 95% confident that if measured the muscle mass of a new 48 year old woman, the measured muscle mass would fall between 82.9116 and 115.5976 lbs. As can be seen from the output, the prediction interval is wider due to the greater uncertainty involved in predicting the value of a new observation (as opposed to the confidence interval which is focused on estimating the parameter value based on the mean of the existing observations). Given this greater uncertainty, we need a wider interval to get to a 95% level of confidence. So in sum, we accept less precision to maintain the same level of confidence.
+
+
+### 8.4e Test whether the quadratic term can be dropped from the regression model. Use alpha = 0.05. State alternatives, decision rule, and conclusion.
+
+##### Alternatives are H~0~: B~11~ equals 0, H~a~: B~11~ does not equal 0. Alpha = 0.05. 
+##### Decision rule: If |t*| > t-critical value reject null hypothesis and conclude Ha. Otherwise, fail to reject null hypothesis. 
+```{r}
+
+summary(mquad)
+print(paste("T-critical value for 5% alpha and 57 df:",round((qt(0.975,57)),digits = 4)))
+
+```
+#####  Conclusion: The absolute value of t* is 1.776 (which can be computed manually by dividing the point estimate of the quadratic term by it's standard error: 0.014840/0.008357), and because it is less than the t-critical value of 2.0025, we fail to reject the null hypothesis. This means that the coefficient is not statistically significant using an alpha of 0.05 so we can drop it from the model. Alternatively, you can also see that the p-value of the coefficient is greater than alpha so that is also an indication that it is not statistically significant.  
+
+
+### 8.4f Express the fitted regression function obtained in part a in terms of the original variable X
+
+```{r}
+fitted_model <- lm(Y~X + Age_Squared, data = Muscle_Mass2)
+summary(fitted_model)
+
+```
+##### Regression Function: E{Y} = 207.349608 - 2.964323X + 0.014840$X^2$
+
+### Calculate the coefficient of simple correlation between X and $X^2$. Is the use of a centered variable helpful here?
+
+```{r}
+print(paste("Correlation between X and X^2:",cor(Muscle_Mass2$X,Muscle_Mass2$Age_Squared)))
+
+print(paste("Correlation between X and centered version of X^2:",cor(centered_df$Age_c,centered_df$Age_c^2)))
+
+```
+
+##### The correlation between X and $X^2$ is very high in the non-centered dataframe (99.6%) which indicates a problem with multicollinearity. Multicollinearity reduces the precision of the estimates and makes them harder to interpret by changing the coefficient estimates substantially and inflating the standard errors. Using the centered variable helps a lot in this case since the correlation drops from a very strong positive correlation of 99.6% to a very weak negative correlation of -3.84%. 
+
+
+## 8.5 Refer to Muscle Mass Problems 1.27 and 8.4 A person's muscle mass is expected to decrease with age. To explore this relationship in women, a nutritionist randomly selected 15 women from each 10 year age group beginning with age 40 and ending with age 79. X is age and Y is a measure of muscle mass. A second order regression model 8.2 with independent normal error terms is expected to be appropriate. 
+
+### 8.5a Obtain the residuals from the fit in 8.4a and plot them against $\hat{Y}$ and against X on separate graphs. Also prepare a normal probability plot. Interpret your plots. 
+
+```{r}
+plot(mquad$residuals~mquad$fitted.values,xlab = "Predicted Values", ylab = "Residuals")
+plot(mquad$residuals~centered_df$Age_centered,xlab ="X_Centered", ylab = "Residuals")
+plot(mquad$residuals~centered_df$Age_centered^2,xlab ="X_Centered Squared", ylab = "Residuals")
+
+residuals <- resid(mquad)
+
+qqnorm(residuals)
+qqline(residuals)
+```
+
+##### The plots of residuals against $\hat{Y}$ and both X values do not appear to show issues with non-constancy of error variance or non-linearity as they scatter randomly around the baseline of 0. The QQ plot is nearly linear so there does not appear to be any issues with non-normality of error terms. 
+
+
+
+### 8.5b Test formally for lack of fit of the quadratic function using alpha of 0.05. State the alternatives, decision rule and conclusion. What assumptions did you make implicitly in this test.
+
+##### H~0~: Reduced model: E{Y} = B~0~ + B~11~X1 + B~11~X1^2
+##### H~a~: Full model aka categorical model: E{Y} =/= B~0~ + B~11~X1 + B~11~X1^2, 
+
+##### F* = MSLF/MSPE. MSLF = SSLF/(c-p). MSPE = SSPE/(n-c). c = number of unique values, p = number of predictor variables. SSLF = SSE(Reduced Model) - SSE(Full Model). SSPE = SSE Full Model. 
+
+##### Decision Rule: Conclude Ha if F* > F-critical value of F(1-alpha;c-p;n-c), otherwise fail to reject null hypothesis. 
+
+
+```{r}
+
+#factor function is used to get unique values only(no duplicates). 
+x1factor <- factor(centered_df$Age_centered)
+x1sq_factor <- factor(centered_df$Age_centered^2)
+
+
+mlin_f <- lm(Y~factor(Age_centered),data = centered_df)
+anova(mquad,mlin_f)
+
+c <- factor(centered_df$Age_centered) # 32 unique values. c- p = 32 - 3 = 29
+
+f_crit <- qf(0.95,29,28,lower.tail = TRUE)
+
+print(paste("F critical value:",round(f_crit,digits = 4)))
+```
+##### Since the F* value of 0.95 is less than the F-critical value of 1.8752 we fail to reject the null hypothesis (there is no issue with lack of fit with the Reduced Model). In this test we assume that the Reduced Model is appropriate unless there is significant statistical evidence to conclude otherwise. In this case since there is not enough evidence to reject the baseline assumption that the relationship is approriate we conclude that there is no issue with lack of fit. 
+
+
+### 8.5c Fit third order model (8.6) and test whether or not B~111~ = 0. Use alpha = 0.05. State alternatives, decision rule, and conclusion. Is your conclusion consistent with your finding in part b.
+
+
+#### - H~0~ aka Null: B~111~ = 0, H~a~: B~111~ is not equal to 0, Alpha = 0.05. 
+
+#### - Decision rule: If |t*| > t-critical value(.975, 56 df) we reject H~0~ and conclude H~a~. Otherwise fail to reject the null hypothesis. 
+
+```{r}
+
+centered_df2 <- subset(centered_df, select = -c(X)) #drop the original X column and save as new df
+Age_c2 <- centered_df2$Age_centered^2 # create vector where the centered column is squared
+Age_c3 <- centered_df2$Age_centered^3 #create vector where centered column is cubed
+third_order_df <- cbind(centered_df2,Age_c2,Age_c3) #add them to the dataframe you created and save as new df
+third_order_model <- lm(Y~Age_centered + Age_c2 + Age_c3, data = third_order_df) #specify the third order model
+
+summary(third_order_model) 
+
+t_crit <- qt(0.975,56,lower.tail = TRUE) 
+print(paste("T critical value 1 - 0.05/2; 56 df:", round(t_crit, digits = 4)))
+
+```
+
+##### From the table we can see that the t-statisic for B~111~ (denoted as Age_c3 which is the cubed value of the original centered X value called Age_c) is 1.782. This is less than the t-critical value of 2.0032. Since the absolute value of t* is less than t-critical value, we conclude H~0~ which is that B~111~ = 0 and is not statistically significant. This conclusion is consistent with 8.5b since the previous question was testing the suitability of the entire model and not one specific coefficient as is the case with this question. In the case of 8.5b we concluded that the entire model was appropriate and did not suffer from a lack of fit issue. Furthermore, a multiple regression model can be significant as a whole even if one or more of it's coefficients are not statistically significant as seen in the summary table in 8.4f where the quadratic term was not statistically significant even though the model as a whole was determined to be statistically significant at the 5% level of significance in 8.4b.  
+
